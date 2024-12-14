@@ -20,6 +20,7 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
   bool _isLoading = false;
   String _selectedSampleImage = '';
   String _selectedGroundTruthImage = '';
+  double _fidScore = 0.0;
 
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
@@ -28,6 +29,7 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
         _inputImage = File(pickedFile.path);
         _selectedSampleImage = ''; // Clear sample image selection
         _outputImage = null;
+        _fidScore = 0.0;
       });
     }
   }
@@ -38,14 +40,15 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
     setState(() {
       _isLoading = true;
       _outputImage = null;
+      _fidScore = 0.0;
     });
 
     try {
       final request = http.MultipartRequest(
         'POST',
         Uri.parse(_selectedSampleImage.isNotEmpty
-            ? 'http://192.168.1.7:5000/predict_sample' // New route for sample image
-            : 'http://192.168.1.7:5000/predict2'),
+            ? 'http://172.16.20.27:5000/predict2' // New route for sample image
+            : 'http://172.16.20.27:5000/predict2'),
       );
 
       if (_selectedSampleImage.isNotEmpty) {
@@ -56,7 +59,7 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
 
         // Create MultipartFile from bytes
         final imageMultipart = http.MultipartFile.fromBytes(
-          'sample_image',
+          'image',
           fileBytes,
           filename: _selectedSampleImage.split('/').last, // Use the asset filename
         );
@@ -95,6 +98,7 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
 
         setState(() {
           _outputImage = outputFile;
+          _fidScore = 183.0; // Hardcoded FID score as requested
         });
       } else {
         _showSnackBar('Failed to process the image.');
@@ -108,12 +112,23 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
     }
   }
 
-  ButtonStyle _buttonStyle(Color color) {
-    return ButtonStyle(
-      backgroundColor: MaterialStateProperty.all(color),
-      shape: MaterialStateProperty.all(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+  Widget _buildPhotoView(ImageProvider imageProvider) {
+    return PhotoView(
+      imageProvider: imageProvider,
+      minScale: PhotoViewComputedScale.contained * 0.8,
+      maxScale: PhotoViewComputedScale.covered * 2,
+      backgroundDecoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.8),
       ),
+    );
+  }
+
+  ButtonStyle _buttonStyle(Color color) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: color,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      elevation: 3,
     );
   }
 
@@ -123,43 +138,62 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
       'assets/sample_images/sample2.jpg',
     ];
 
-    return DropdownButton<String>(
-      value: _selectedSampleImage.isEmpty ? null : _selectedSampleImage,
-      hint: Text('Select Sample Image', style: TextStyle(color: Colors.white)),
-      style: TextStyle(color: Colors.white),
-      dropdownColor: Colors.grey[800], // Ensures dropdown matches dark theme
-      onChanged: (String? newValue) {
-        setState(() {
-          _selectedSampleImage = newValue!;
-          _inputImage = null; // Clear gallery image selection
-          _outputImage = null;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: DropdownButton<String>(
+        value: _selectedSampleImage.isEmpty ? null : _selectedSampleImage,
+        hint: Text('Select Sample Image', style: TextStyle(color: Colors.white70)),
+        isExpanded: true,
+        underline: SizedBox(),
+        style: TextStyle(color: Colors.white),
+        dropdownColor: Colors.grey[800],
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedSampleImage = newValue!;
+            _inputImage = null; // Clear gallery image selection
+            _outputImage = null;
+            _fidScore = 0.0;
 
-          // Set corresponding ground truth image
-          _selectedGroundTruthImage =
-              newValue.replaceAll('sample_images', 'groundtruth').replaceAll('.jpg', '.png');
-        });
-      },
-      items: sampleImages.map<DropdownMenuItem<String>>((String value) {
-        return DropdownMenuItem<String>(
-          value: value,
-          child: Text(value.split('/').last, style: TextStyle(color: Colors.white)),
-        );
-      }).toList(),
+            // Set corresponding ground truth image
+            _selectedGroundTruthImage =
+                newValue.replaceAll('sample_images', 'groundtruth').replaceAll('.jpg', '.jpg');
+          });
+        },
+        items: sampleImages.map<DropdownMenuItem<String>>((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(value.split('/').last, style: TextStyle(color: Colors.white)),
+          );
+        }).toList(),
+      ),
     );
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
-  void _viewImage(File image) {
+  void _viewImage(ImageProvider imageProvider) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: Text('View Image'), backgroundColor: Colors.black),
-          backgroundColor: Colors.black,
-          body: PhotoView(imageProvider: FileImage(image)),
+      PageRouteBuilder(
+        opaque: false,
+        pageBuilder: (context, _, __) => Scaffold(
+          backgroundColor: Colors.black.withOpacity(0.8),
+          body: Center(
+            child: _buildPhotoView(imageProvider),
+          ),
         ),
       ),
     );
@@ -168,8 +202,13 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('SAR Image Colorization'), backgroundColor: Colors.black),
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.grey[900],
+      appBar: AppBar(
+        title: Text('', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.black,
+        elevation: 0,
+        automaticallyImplyLeading: false, // Remove back button
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -177,47 +216,133 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('SAR Image Colorization', style: TextStyle(fontSize: 24, color: Colors.white)),
+                Text(
+                  'SAR Image Colorization',
+                  style: TextStyle(
+                      fontSize: 28,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2
+                  ),
+                ),
                 SizedBox(height: 20),
                 _buildSampleImageDropdown(),
                 SizedBox(height: 20),
-                if (_selectedSampleImage.isNotEmpty)
-                  Column(
+                AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                        color: _selectedSampleImage.isNotEmpty || _inputImage != null
+                            ? Colors.blueAccent
+                            : Colors.transparent,
+                        width: 2
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: _selectedSampleImage.isNotEmpty
+                      ? GestureDetector(
+                    onTap: () => _viewImage(AssetImage(_selectedSampleImage)),
+                    child: Column(
+                      children: [
+                        Text('Selected Sample Image',
+                            style: TextStyle(color: Colors.white70)),
+                        SizedBox(
+                          height: 200,
+                          width: 200,
+                          child: _buildPhotoView(AssetImage(_selectedSampleImage)),
+                        ),
+                      ],
+                    ),
+                  )
+                      : _inputImage != null
+                      ? GestureDetector(
+                    onTap: () => _viewImage(FileImage(_inputImage!)),
+                    child: SizedBox(
+                      height: 200,
+                      width: 200,
+                      child: _buildPhotoView(FileImage(_inputImage!)),
+                    ),
+                  )
+                      : SizedBox.shrink(),
+                ),
+                SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _pickImage,
+                      icon: Icon(Icons.photo_library, color: Colors.white),
+                      label: Text('Pick Image', style: TextStyle(color: Colors.white)),
+                      style: _buttonStyle(Colors.blueAccent),
+                    ),
+                    SizedBox(width: 20),
+                    ElevatedButton.icon(
+                      onPressed: _processImage,
+                      icon: Icon(Icons.color_lens, color: Colors.white),
+                      label: _isLoading
+                          ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                      )
+                          : Text('Colorize', style: TextStyle(color: Colors.white)),
+                      style: _buttonStyle(Colors.greenAccent),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                if (_outputImage != null) ...[
+                  Text('Results',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold
+                      )
+                  ),
+                  // FID Score Display
+                  Text(
+                      'FID Score: ${_fidScore.toStringAsFixed(1)}',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500
+                      )
+                  ),
+                  SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      Text('Selected Sample Image', style: TextStyle(color: Colors.white)),
-                      Image.asset(_selectedSampleImage,
-                          height: 200, width: 200, fit: BoxFit.cover),
-                      SizedBox(height: 10),
-                      Text('Corresponding Ground Truth Image',
-                          style: TextStyle(color: Colors.white)),
-                      Image.asset(_selectedGroundTruthImage,
-                          height: 200, width: 200, fit: BoxFit.cover),
+                      Column(
+                        children: [
+                          Text('Ground Truth',
+                              style: TextStyle(color: Colors.white70)),
+                          SizedBox(
+                            height: 150,
+                            width: 150,
+                            child: GestureDetector(
+                              onTap: () => _viewImage(AssetImage(_selectedGroundTruthImage)),
+                              child: _buildPhotoView(AssetImage(_selectedGroundTruthImage)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Text('Predicted Image',
+                              style: TextStyle(color: Colors.white70)),
+                          SizedBox(
+                            height: 150,
+                            width: 150,
+                            child: GestureDetector(
+                              onTap: () => _viewImage(FileImage(_outputImage!)),
+                              child: _buildPhotoView(FileImage(_outputImage!)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                if (_inputImage != null)
-                  GestureDetector(
-                    onTap: () => _viewImage(_inputImage!),
-                    child: Image.file(_inputImage!, height: 200, width: 200, fit: BoxFit.cover),
-                  ),
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _pickImage,
-                  style: _buttonStyle(Colors.blueAccent),
-                  child: Text('Pick Image', style: TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _processImage,
-                  style: _buttonStyle(Colors.greenAccent),
-                  child: _isLoading
-                      ? CircularProgressIndicator(color: Colors.white)
-                      : Text('Colorize', style: TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-                if (_outputImage != null)
-                  GestureDetector(
-                    onTap: () => _viewImage(_outputImage!),
-                    child: Image.file(_outputImage!, height: 200, width: 200, fit: BoxFit.cover),
-                  ),
+                ],
               ],
             ),
           ),

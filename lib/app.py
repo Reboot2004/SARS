@@ -24,6 +24,7 @@ onnx_model_path = "sar2rgb.onnx"
 onnx_sess = onnxruntime.InferenceSession(onnx_model_path)
 fid = FrechetInceptionDistance().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 #Load a pre-trained VIT Model
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 vit_model_path = "vit_model.pth"  # Replace with the actual path to your .pth file
 vit_model = torch.load(vit_model_path, map_location=device)
@@ -68,38 +69,120 @@ def predict_vgg16():
     return jsonify(predicted_class)
 
 # SAR Colorization
+import torch
+import numpy as np
+from scipy.linalg import sqrtm
+from PIL import Image
+from torchvision.transforms import functional as F
+import torchvision.transforms.v2 as v2
+import gc
+from io import BytesIO
+from torchvision import models
+# Function to extract features from Inception v3
+def extract_features(images, model):
+    print("extarct")
+    images = images.cuda() if torch.cuda.is_available() else images
+    with torch.no_grad():
+        features = model(images)
+    return features.cpu().numpy()
+
+# Function to calculate FID
+def calculate_fid(real_features, generated_features):
+    real_img_preprocessed = preprocess_image(real_img)
+    generated_img_preprocessed = preprocess_image(generated_img)
+
+        # Extract features using InceptionV3
+    real_features = model.predict(real_img_preprocessed)
+    generated_features = model.predict(generated_img_preprocessed)
+
+        # Compute mean and covariance for the real and generated features
+    mu_real = np.mean(real_features, axis=0)
+    mu_gen = np.mean(generated_features, axis=0)
+
+    #sigma_real = np.cov(real_features, rowvar=False)
+    #sigma_gen = np.cov(generated_features, rowvar=False)
+
+        # Compute the FID score
+    diff = mu_real - mu_gen
+    #covmean = sqrtm(sigma_real.dot(sigma_gen))
+
+        # If covmean is complex, take the real part
+    #if np.iscomplexobj(covmean):
+    #    covmean = covmean.real
+
+    fid = diff.dot(diff) #+ np.trace(sigma_real + sigma_gen - 2 * covmean)
+
+    return fid
+
 @app.route('/predict_sample', methods=['POST'])
 def predict_sample():
-    if 'generated_image' not in request.files or 'groundtruth_image' not in request.files:
-        return jsonify({'error': 'Both generated and ground truth images are required'}), 400
+    if 'sample_image' not in request.files or 'ground_truth' not in request.files:
+        return jsonify({'error': 'Both sample and ground truth images are required'}), 400
 
-    generated_file = request.files['generated_image']
-    groundtruth_file = request.files['groundtruth_image']
+    sample_file = request.files['sample_image']
+    groundtruth_file = request.files['ground_truth']
 
-    # Clear any previous image and data before loading new ones
+    # Clear previous data
     gc.collect()
 
     try:
-        # Load and preprocess the generated image
-        generated_img = Image.open(BytesIO(generated_file.read())).convert('RGB')
-        generated_img = generated_img.resize((256, 256))  # Resize to match ONNX model output
-        generated_tensor = transforms.ToTensor()(generated_img).unsqueeze(0).to(fid.device)
-
-        # Load and preprocess the ground truth image
+        # Load Inception model (e.g., torchvision.models.inception_v3)
+        inception = models.inception_v3(weights='DEFAULT', transform_input=False).eval()
+        print("1")
+        transform = v2.Compose([
+            v2.Resize(299, antialias=True),
+            v2.CenterCrop(299),
+            v2.ToImage(),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+        print("1")
+        # Process the sample image
+        sample_img = Image.open(BytesIO(sample_file.read())).convert('RGB')
+        sample_tensor = transform(sample_img).unsqueeze(0)  # Add batch dimension
+        print("1")
+        # Generate the image using ONNX model
+        expected_size = (256, 256)  # Replace with ONNX model input size
+        sample_img = sample_img.resize(expected_size, Image.Resampling.LANCZOS)
+        sample_array = np.array(sample_img).transpose(2, 0, 1)
+        sample_array = sample_array.astype(np.float32) / 255.0
+        sample_array = (sample_array - 0.5) / 0.5
+        sample_array = np.expand_dims(sample_array, axis=0)
+        inputs = {onnx_sess.get_inputs()[0].name: sample_array}
+        output = onnx_sess.run(None, inputs)
+        print("1")
+        # Post-process generated image
+        generated_img_array = output[0].squeeze().transpose(1, 2, 0)
+        generated_img_array = (generated_img_array + 1) / 2
+        generated_img_array = (generated_img_array * 255).astype(np.uint8)
+        generated_img = Image.fromarray(generated_img_array)
+        print("1")
+        # Prepare tensors for feature extraction
+        generated_tensor = transform(generated_img).unsqueeze(0)
         groundtruth_img = Image.open(BytesIO(groundtruth_file.read())).convert('RGB')
-        groundtruth_img = groundtruth_img.resize((256, 256))
-        groundtruth_tensor = transforms.ToTensor()(groundtruth_img).unsqueeze(0).to(fid.device)
-
-        # Calculate FID score
-        fid.update(generated_tensor, real=False)
-        fid.update(groundtruth_tensor, real=True)
-        fid_score = fid.compute().item()
-
-        # Return the FID score and optionally the generated image
-        return jsonify({'fid_score': fid_score})
+        groundtruth_tensor = transform(groundtruth_img).unsqueeze(0)
+        print("1")
+        # Extract features
+        generated_features = extract_features(generated_tensor, inception)
+        groundtruth_features = extract_features(groundtruth_tensor, inception)
+        print("1")
+        # Compute FID
+        fid_score = calculate_fid(groundtruth_features, generated_features)
+        print("1")
+        # Prepare the generated image for response
+        img_byte_arr = BytesIO()
+        generated_img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+        print("1")
+        return jsonify({
+            'fid_score': fid_score,
+            'generated_image': img_byte_arr.getvalue().hex()
+        })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
 @app.route('/predict2', methods=['POST'])
 def predict_onnx():
     if 'image' not in request.files:

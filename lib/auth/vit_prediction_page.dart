@@ -54,7 +54,7 @@ class _VITPredictionPageState extends State<VITPredictionPage> {
     try {
       http.MultipartRequest request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.1.7:5000/predict_vit'), // Replace with your Flask server URL
+        Uri.parse('http://172.16.20.27:5000/predict_vit'), // Replace with your Flask server URL
       );
 
       if (_image != null) {

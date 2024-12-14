@@ -76,12 +76,18 @@ flutter:
     - assets/images/sample2.jpeg
     - assets/sample_images/sample1.jpg
     - assets/sample_images/sample2.jpg
-    - assets/groundtruth/sample1.png
-    - assets/groundtruth/sample2.png #sample1.png
+    - assets/groundtruth/sample1.jpg
+    - assets/groundtruth/sample2.jpg
+    - assets/images/sample1.png
+    - assets/images/sample2.png
+    - assets/images/sample3.png
+    - assets/masks/sample1.png
+    - assets/masks/sample2.png
+    - assets/masks/sample3.png   #sample1.jpg
     # - images/sample1.jpeg
     # - images/sample2.jpeg
      #- images/ROIs1970_fall_s1_115_p100.png
-    # - images/sample2.png
+    # - images/sample2.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
