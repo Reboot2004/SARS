@@ -12,10 +12,11 @@ class VITPredictionPage extends StatefulWidget {
 }
 
 class _VITPredictionPageState extends State<VITPredictionPage> {
-  File? _image;
+  File? _inputImage;
   final ImagePicker _picker = ImagePicker();
   String _result = '';
-  String? _selectedSampleImage;
+  bool _isLoading = false;
+  String _selectedSampleImage = '';
   final Map<String, String> sampleImages = {
     'Sample Image 1': 'assets/images/sample1.jpeg',
     'Sample Image 2': 'assets/images/sample2.jpeg',
@@ -25,95 +26,145 @@ class _VITPredictionPageState extends State<VITPredictionPage> {
     'Wheat',
   ];
 
-  // Pick an image from the gallery
+  ButtonStyle _buttonStyle(Color color) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: color,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      elevation: 3,
+    );
+  }
+
+  Widget _buildPhotoView(ImageProvider imageProvider) {
+    return PhotoView(
+      imageProvider: imageProvider,
+      minScale: PhotoViewComputedScale.contained * 0.8,
+      maxScale: PhotoViewComputedScale.covered * 2,
+      backgroundDecoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.8),
+      ),
+    );
+  }
+
+  void _viewImage(ImageProvider imageProvider) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        opaque: false,
+        pageBuilder: (context, _, __) => Scaffold(
+          backgroundColor: Colors.black.withOpacity(0.8),
+          body: Center(
+            child: _buildPhotoView(imageProvider),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSampleImageDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: DropdownButton<String>(
+        value: _selectedSampleImage.isEmpty ? null : _selectedSampleImage,
+        hint: Text('Select Sample Image', style: TextStyle(color: Colors.white70)),
+        isExpanded: true,
+        underline: SizedBox(),
+        style: TextStyle(color: Colors.white),
+        dropdownColor: Colors.grey[800],
+        onChanged: (String? newValue) {
+          setState(() {
+            _selectedSampleImage = newValue!;
+            _inputImage = null;
+            _result = '';
+          });
+        },
+        items: sampleImages.keys.map<DropdownMenuItem<String>>((String key) {
+          return DropdownMenuItem<String>(
+            value: key,
+            child: Text(key, style: TextStyle(color: Colors.white)),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
-        _image = File(pickedFile.path);
-        _selectedSampleImage = null; // Reset sample image selection
+        _inputImage = File(pickedFile.path);
+        _selectedSampleImage = '';
+        _result = '';
       });
     }
   }
 
-  // Load a sample image
-  Future<void> _loadSampleImage(String assetPath) async {
-    setState(() {
-      _image = null; // Reset _image as it's for user-uploaded files
-      _selectedSampleImage = sampleImages.keys.firstWhere(
-            (key) => sampleImages[key] == assetPath,
-      );
-      _result = ''; // Clear prediction result for a new sample
-    });
-  }
-
-  // Send the image to the Flask server for prediction
   Future<void> _predict() async {
-    if (_image == null && _selectedSampleImage == null) return;
+    if (_inputImage == null && _selectedSampleImage.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+      _result = '';
+    });
 
     try {
-      http.MultipartRequest request = http.MultipartRequest(
+      final request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.1.7:5000/predict_vit'), // Replace with your Flask server URL
+        Uri.parse('http://192.168.1.7:5000/predict_vit'),
       );
 
-      if (_image != null) {
-        // User-uploaded file
-        request.files.add(
-          await http.MultipartFile.fromPath('image', _image!.path),
-        );
-      } else if (_selectedSampleImage != null) {
-        // Asset image
+      if (_selectedSampleImage.isNotEmpty) {
+        // Handle asset image
         final assetPath = sampleImages[_selectedSampleImage]!;
-        final byteData = await rootBundle.load(assetPath); // Load the asset
+        final byteData = await rootBundle.load(assetPath);
         final fileBytes = byteData.buffer.asUint8List();
 
         request.files.add(
           http.MultipartFile.fromBytes(
             'image',
             fileBytes,
-            filename: _selectedSampleImage, // Give it a name
+            filename: _selectedSampleImage,
           ),
+        );
+      } else if (_inputImage != null) {
+        // Handle gallery image
+        request.files.add(
+          await http.MultipartFile.fromPath('image', _inputImage!.path),
         );
       }
 
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
-
-      // Decode JSON response
       final decodedResponse = json.decode(responseData);
 
-      // Extract prediction field
-      final prediction = decodedResponse['predicted_class']; // Update this key based on your JSON structure
-
       setState(() {
-        _result = prediction != null ? prediction.toString() : 'No prediction found.';
+        _result = decodedResponse['predicted_class'] ?? 'No prediction found.';
       });
     } catch (e) {
       setState(() {
         _result = 'Error: Unable to fetch prediction.';
       });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
-  }
-
-
-  // Get ground truth for selected sample
-  String? _getGroundTruth() {
-    if (_selectedSampleImage != null) {
-      int index = sampleImages.keys.toList().indexOf(_selectedSampleImage!);
-      return groundTruths[index];
-    }
-    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[900],
       appBar: AppBar(
-        title: Text('VIT Prediction'),
+        title: Text('', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
+        elevation: 0,
+        automaticallyImplyLeading: false,
       ),
-      backgroundColor: Colors.black,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -122,200 +173,128 @@ class _VITPredictionPageState extends State<VITPredictionPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Select an Image',
+                  'VIT Crop Classification',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 28,
                     color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
                   ),
                 ),
                 SizedBox(height: 20),
-                _childImageWidget(),
+                _buildSampleImageDropdown(),
                 SizedBox(height: 20),
-                DropdownButton<String>(
-                  value: _selectedSampleImage,
-                  hint: Text(
-                    'Select a Sample Image',
-                    style: TextStyle(color: Colors.white),
+                AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _selectedSampleImage.isNotEmpty || _inputImage != null
+                          ? Colors.blueAccent
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  dropdownColor: Colors.black,
-                  items: sampleImages.keys.map((String key) {
-                    return DropdownMenuItem<String>(
-                      value: key,
-                      child: Text(
-                        key,
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    _loadSampleImage(sampleImages[newValue]!);
-                  },
+                  child: _selectedSampleImage.isNotEmpty
+                      ? GestureDetector(
+                    onTap: () => _viewImage(AssetImage(sampleImages[_selectedSampleImage]!)),
+                    child: Column(
+                      children: [
+                        Text('Selected Sample Image',
+                            style: TextStyle(color: Colors.white70)),
+                        SizedBox(
+                          height: 200,
+                          width: 200,
+                          child: _buildPhotoView(
+                              AssetImage(sampleImages[_selectedSampleImage]!)),
+                        ),
+                      ],
+                    ),
+                  )
+                      : _inputImage != null
+                      ? GestureDetector(
+                    onTap: () => _viewImage(FileImage(_inputImage!)),
+                    child: SizedBox(
+                      height: 200,
+                      width: 200,
+                      child: _buildPhotoView(FileImage(_inputImage!)),
+                    ),
+                  )
+                      : SizedBox.shrink(),
                 ),
                 SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _pickImage,
-                  style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.all(Colors.blueAccent),
-                    shape: MaterialStateProperty.all(
-                      RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _pickImage,
+                      icon: Icon(Icons.photo_library, color: Colors.white),
+                      label: Text('Pick Image', style: TextStyle(color: Colors.white)),
+                      style: _buttonStyle(Colors.blueAccent),
                     ),
-                    padding: MaterialStateProperty.all(
-                      EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                    SizedBox(width: 20),
+                    ElevatedButton.icon(
+                      onPressed: _predict,
+                      icon: Icon(Icons.analytics, color: Colors.white),
+                      label: _isLoading
+                          ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      )
+                          : Text('Predict', style: TextStyle(color: Colors.white)),
+                      style: _buttonStyle(Colors.greenAccent),
                     ),
-                  ),
-                  child: Text(
-                    'Pick Image',
+                  ],
+                ),
+                SizedBox(height: 20),
+                if ((_selectedSampleImage.isNotEmpty || _inputImage != null) && _result.isNotEmpty) ...[
+                  Text(
+                    'Results',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 20,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _predict,
-                  style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.all(Colors.greenAccent),
-                    shape: MaterialStateProperty.all(
-                      RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    padding: MaterialStateProperty.all(
-                      EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                    ),
-                  ),
-                  child: Text(
-                    'Predict',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 30),
-                Text(
-                  'Prediction Result:',
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: Colors.lightBlueAccent,
-                  ),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  _result.isNotEmpty ? _result : 'No result yet.',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.tealAccent,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (_getGroundTruth() != null)
-                  Column(
+                  SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      SizedBox(height: 10),
-                      Text(
-                        'Ground Truth:',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: Colors.white,
-                        ),
+                      Column(
+                        children: [
+                          Text('Prediction', style: TextStyle(color: Colors.white70)),
+                          Text(
+                            _result,
+                            style: TextStyle(
+                              color: Colors.tealAccent,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        _getGroundTruth()!,
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.orange,
+                      if (_selectedSampleImage.isNotEmpty)
+                        Column(
+                          children: [
+                            Text('Ground Truth', style: TextStyle(color: Colors.white70)),
+                            Text(
+                              groundTruths[sampleImages.keys.toList().indexOf(_selectedSampleImage)],
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                        textAlign: TextAlign.center,
-                      ),
                     ],
                   ),
+                ],
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  // Helper widget to display the image
-  Widget _childImageWidget() {
-    if (_image != null) {
-      // Render user-selected file
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (BuildContext imageContext) => PhotoViewPage(
-                imageFile: _image!,
-                isAsset: false,
-              ),
-            ),
-          );
-        },
-        child: Image.file(
-          _image!,
-          height: 200,
-          fit: BoxFit.cover,
-        ),
-      );
-    } else if (_selectedSampleImage != null) {
-      // Render sample image from assets
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (BuildContext imageContext) => PhotoViewPage(
-                imageAssetPath: sampleImages[_selectedSampleImage]!,
-                isAsset: true,
-              ),
-            ),
-          );
-        },
-        child: Image.asset(
-          sampleImages[_selectedSampleImage]!,
-          height: 200,
-          fit: BoxFit.cover,
-        ),
-      );
-    } else {
-      return Text(
-        'No image selected.',
-        style: TextStyle(color: Colors.white),
-      );
-    }
-  }
-}
-
-// PhotoViewPage class for zooming into the image
-class PhotoViewPage extends StatelessWidget {
-  final File? imageFile;
-  final String? imageAssetPath;
-  final bool isAsset;
-
-  const PhotoViewPage({
-    this.imageFile,
-    this.imageAssetPath,
-    required this.isAsset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: PhotoView(
-          imageProvider: isAsset
-              ? AssetImage(imageAssetPath!)
-              : FileImage(imageFile!) as ImageProvider,
-          minScale: PhotoViewComputedScale.contained,
-          maxScale: PhotoViewComputedScale.covered * 2,
-          heroAttributes: const PhotoViewHeroAttributes(tag: "imageHero"),
         ),
       ),
     );
