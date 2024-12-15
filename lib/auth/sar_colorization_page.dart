@@ -46,9 +46,8 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse(_selectedSampleImage.isNotEmpty
-            ? 'http://172.16.20.27:5000/predict2' // New route for sample image
-            : 'http://172.16.20.27:5000/predict2'),
+        Uri.parse('http://192.168.1.7:5000/predict2' // New route for sample image
+            ),
       );
 
       if (_selectedSampleImage.isNotEmpty) {
@@ -291,7 +290,7 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
                   ],
                 ),
                 SizedBox(height: 20),
-                if (_outputImage != null) ...[
+                if (_selectedSampleImage!= '' && _outputImage != null) ...[
                   Text('Results',
                       style: TextStyle(
                           color: Colors.white,
@@ -309,6 +308,7 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
                       )
                   ),
                   SizedBox(height: 10),
+                  if(_selectedSampleImage!='')
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -342,8 +342,30 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
                       ),
                     ],
                   ),
-                ],
+                ]
+                else if(_selectedSampleImage == '' && _outputImage!=null)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+
+                      Column(
+                        children: [
+                          const Text('Predicted Image',
+                              style: TextStyle(color: Colors.white70)),
+                          SizedBox(
+                            height: 150,
+                            width: 150,
+                            child: GestureDetector(
+                              onTap: () => _viewImage(FileImage(_outputImage!)),
+                              child: _buildPhotoView(FileImage(_outputImage!)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
               ],
+
             ),
           ),
         ),

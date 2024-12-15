@@ -131,7 +131,7 @@ class _FloodPageState extends State<FloodPage> {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://172.16.20.27:5000/flood'),
+        Uri.parse('http://192.168.1.7:5000/flood'),
       );
 
       if (_selectedSampleImage.isNotEmpty) {
@@ -306,7 +306,7 @@ class _FloodPageState extends State<FloodPage> {
                     style: TextStyle(color: Colors.red, fontSize: 16),
                     textAlign: TextAlign.center,
                   ),
-                if (_outputImage != null) ...[
+                if (_selectedSampleImage!='' && _outputImage != null) ...[
                   Text('Results',
                       style: TextStyle(
                           color: Colors.white,
@@ -324,12 +324,13 @@ class _FloodPageState extends State<FloodPage> {
                       )
                   ),
                   SizedBox(height: 10),
+                  if(_selectedSampleImage!='')
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       Column(
                         children: [
-                          if (_outputImage != null && _selectedSampleImage!=null)
+                          if (_outputImage != null && _selectedSampleImage!='')
                             Text('Ground Truth',
                                 style: TextStyle(color: Colors.white70)),
                             SizedBox(
@@ -357,9 +358,28 @@ class _FloodPageState extends State<FloodPage> {
                         ],
                       ),
                     ],
+                  ),]
+                  else if (_selectedSampleImage == '' && _outputImage!=null)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Column(
+                        children: [
+                          Text('Predicted Image',
+                              style: TextStyle(color: Colors.white70)),
+                          SizedBox(
+                            height: 150,
+                            width: 150,
+                            child: GestureDetector(
+                              onTap: () => _viewImage(MemoryImage(_outputImage!)),
+                              child: _buildPhotoView(MemoryImage(_outputImage!)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-                if (_outputImage != null)
+                if (_outputImage != '')
                   IconButton(
                     onPressed: _refresh,
                     icon: Icon(Icons.autorenew, color: Colors.white),
