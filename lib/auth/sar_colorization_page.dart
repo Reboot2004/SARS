@@ -46,7 +46,7 @@ class _SARColorizationPageState extends State<SARColorizationPage> {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.1.7:5000/predict2' // New route for sample image
+        Uri.parse('http://172.17.20.02:5000/predict2' // New route for sample image
             ),
       );
 

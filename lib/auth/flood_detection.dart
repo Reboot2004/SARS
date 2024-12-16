@@ -131,7 +131,7 @@ class _FloodPageState extends State<FloodPage> {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('http://192.168.1.7:5000/flood'),
+        Uri.parse('http://17.17.20.02:5000/flood'),
       );
 
       if (_selectedSampleImage.isNotEmpty) {
