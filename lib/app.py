@@ -12,7 +12,7 @@ import torch
 from torchvision import transforms  # For image preprocessing in ViT
 from patchify import patchify
 import cv2
-from torchmetrics.image.fid import FrechetInceptionDistance  # Import FID calculation
+#from torchmetrics.image.fid import FrechetInceptionDistance  # Import FID calculation
 app = Flask(__name__)
 CORS(app)  # Allow cross-origin requests
 
@@ -22,7 +22,7 @@ keras_model = load_model('model.keras', custom_objects={"dice_loss": lambda x, y
 # Load the ONNX model for SAR image colorization
 onnx_model_path = "sar2rgb.onnx"
 onnx_sess = onnxruntime.InferenceSession(onnx_model_path)
-fid = FrechetInceptionDistance().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+#fid = FrechetInceptionDistance().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 #Load a pre-trained VIT Model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -87,32 +87,32 @@ def extract_features(images, model):
     return features.cpu().numpy()
 
 # Function to calculate FID
-def calculate_fid(real_features, generated_features):
-    real_img_preprocessed = preprocess_image(real_img)
-    generated_img_preprocessed = preprocess_image(generated_img)
-
-        # Extract features using InceptionV3
-    real_features = model.predict(real_img_preprocessed)
-    generated_features = model.predict(generated_img_preprocessed)
-
-        # Compute mean and covariance for the real and generated features
-    mu_real = np.mean(real_features, axis=0)
-    mu_gen = np.mean(generated_features, axis=0)
-
-    #sigma_real = np.cov(real_features, rowvar=False)
-    #sigma_gen = np.cov(generated_features, rowvar=False)
-
-        # Compute the FID score
-    diff = mu_real - mu_gen
-    #covmean = sqrtm(sigma_real.dot(sigma_gen))
-
-        # If covmean is complex, take the real part
-    #if np.iscomplexobj(covmean):
-    #    covmean = covmean.real
-
-    fid = diff.dot(diff) #+ np.trace(sigma_real + sigma_gen - 2 * covmean)
-
-    return fid
+# def calculate_fid(real_features, generated_features):
+#     real_img_preprocessed = preprocess_image(real_img)
+#     generated_img_preprocessed = preprocess_image(generated_img)
+#
+#         # Extract features using InceptionV3
+#     real_features = model.predict(real_img_preprocessed)
+#     generated_features = model.predict(generated_img_preprocessed)
+#
+#         # Compute mean and covariance for the real and generated features
+#     mu_real = np.mean(real_features, axis=0)
+#     mu_gen = np.mean(generated_features, axis=0)
+#
+#     #sigma_real = np.cov(real_features, rowvar=False)
+#     #sigma_gen = np.cov(generated_features, rowvar=False)
+#
+#         # Compute the FID score
+#     diff = mu_real - mu_gen
+#     #covmean = sqrtm(sigma_real.dot(sigma_gen))
+#
+#         # If covmean is complex, take the real part
+#     #if np.iscomplexobj(covmean):
+#     #    covmean = covmean.real
+#
+#     fid = diff.dot(diff) #+ np.trace(sigma_real + sigma_gen - 2 * covmean)
+#
+#     return fid
 
 @app.route('/predict_sample', methods=['POST'])
 def predict_sample():
