@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  flutter-web:
+    build: .
+    ports:
+      - "8095:8095"
+    volumes:
+      - .:/app
+    environment:
+      - DISPLAY=:99
+    command: flutter run -d chrome --web-port 8095

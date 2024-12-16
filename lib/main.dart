@@ -9,10 +9,12 @@ import 'auth/signup_page.dart';
 import 'repositories/user_repository.dart';
 import 'main_page.dart';
 import './utils/constants.dart';
-
+import 'package:sars/firebase_options.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform, // Use generated options
+  );
   FirebaseAppCheck.instance.activate(
     webProvider: ReCaptchaV3Provider('7CE6FBEE-9F51-4C5E-9A97-97F065699F90'), // Replace with your actual site key
   );
