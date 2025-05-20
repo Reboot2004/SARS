@@ -1,7 +1,7 @@
 # SARS: Synthetic Aperture Radar Analysis & Recognition System
 
 <div align="center">
-  <img src="assets/images/logo.png" alt="SARS Logo" width="200"/>
+  
   <br>
   <h3>Advanced SAR Image Processing Suite: Colorization, Crop Classification & Flood Detection</h3>
 </div>
@@ -160,19 +160,14 @@ SARS/
 
 | SAR Input | Colorized Output | Optical Reference |
 |-----------|------------------|-------------------|
-| ![SAR](assets/examples/colorization/sar_input.png) | ![Colorized](assets/examples/colorization/output.png) | ![Optical](assets/examples/colorization/optical_reference.png) |
+| ![SAR](assets/ROIs1868_summer_s2_59_p10.png) | ![Colorized](assets/ROIs1868_summer_s1_59_p10.png) | ![Optical](assets/ROIs1868_summer_s2_59_p10.png) |
 
-### Crop Classification
-
-| SAR Input | Classification Map | Ground Truth |
-|-----------|-------------------|--------------|
-| ![SAR](assets/examples/crop/sar_input.png) | ![Classified](assets/examples/crop/classification.png) | ![Ground Truth](assets/examples/crop/ground_truth.png) |
 
 ### Flood Detection
 
 | Pre-event SAR | Post-event SAR | Flood Extent Map |
 |---------------|----------------|------------------|
-| ![Pre-event](assets/examples/flood/pre_event.png) | ![Post-event](assets/examples/flood/post_event.png) | ![Flood Map](assets/examples/flood/flood_extent.png) |
+| ![Area](assets/images/sample2.png) | ![Masked Area](assets/masks/sample2.png) | !
 
 ## 📈 Performance Metrics
 
