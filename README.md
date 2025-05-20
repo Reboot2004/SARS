@@ -112,15 +112,9 @@ SARS/
 ├── ios/                   # iOS-specific code
 ├── lib/                   # Dart source code
 │   ├── models/            # Data models
-│   ├── screens/           # UI screens for different functionalities
-│   ├── services/          # Business logic and processing services
+│   ├── auth/           # UI screens for different functionalities
 │   ├── utils/             # Utility functions
 │   └── main.dart          # Application entry point
-├── native/                # C++ code for optimized processing
-├── scripts/               # Python scripts for model training
-│   ├── colorization/      # Pix2Pix GAN training scripts
-│   ├── crop_classification/ # ViT model training
-│   └── flood_detection/   # UNTER model implementation
 ├── assets/                # Sample images, models, and other resources
 └── test/                  # Test cases
 ```
